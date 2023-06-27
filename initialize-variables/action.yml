@@ -1,0 +1,72 @@
+name: Initialize variables
+description: 'Initialize variables from push, pr, or manual workflow dispatch'
+
+inputs:
+  full:
+    type: boolean
+    description: "Run Full CI Build"
+    required: false
+    default: false
+
+outputs:
+  COMMIT_MESSAGE:
+    description: "Latest commit message"
+    value: ${{ steps.setup.outputs.COMMIT_MSG }}
+  FULL_BUILD:
+    description: "Whether to do a full build"
+    value:  ${{ steps.setuppush.outputs.FULL_BUILD || steps.setuppr.outputs.FULL_BUILD || steps.setupmanual.outputs.FULL_BUILD }}
+
+runs:
+  using: 'composite'
+  
+  steps:
+    - name: Get Commit Message
+      shell: bash
+      run: echo "COMMIT_MSG=$(git log -1 --pretty=%B HEAD | tr '\n' ' ')" >> $GITHUB_ENV
+      if: ${{ github.event_name == 'push' }}
+      
+    - name: Get Commit Message
+      shell: bash
+      run: echo "COMMIT_MSG=$(git log -1 --pretty=%B HEAD^2 | tr '\n' ' ')" >> $GITHUB_ENV
+      if: ${{ github.event_name == 'pull_request' }}
+
+    - name: Get Commit Message
+      shell: bash
+      run: echo "COMMIT_MSG=$(git log -1 --pretty=%B HEAD^2 | tr '\n' ' ')" >> $GITHUB_ENV
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+
+    - name: Display and Setup Build Args (Push)
+      id: setuppush
+      shell: bash
+      run: |
+        echo "Commit Message: $COMMIT_MSG"
+        echo "Full Run: $FULL_BUILD"
+        echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_OUTPUT
+        echo "FULL_BUILD=$FULL_BUILD" >> $GITHUB_OUTPUT
+      env:
+        FULL_BUILD: ${{ startsWith(github.ref_name, 'v') || contains(github.event.head_commit.message, '[ci-full]') || contains(env.COMMIT_MSG, '[ci-full]') }}
+        if: ${{ github.event_name == 'push' }}
+        
+    - name: Display and Setup Build Args (PR)
+      id: setuppr
+      shell: bash
+      run: |
+        echo "Commit Message: $COMMIT_MSG"
+        echo "Full Run: $FULL_BUILD"
+        echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_OUTPUT
+        echo "FULL_BUILD=$FULL_BUILD" >> $GITHUB_OUTPUT
+      env:
+        FULL_BUILD: ${{ contains(github.event.pull_request.title, '[ci-full]') || contains(env.COMMIT_MSG, '[ci-full]') }}
+      if: ${{ github.event_name == 'pull_request' }}
+          
+    - name: Display and Setup Build Args (Manual)
+      id: setupmanual
+      shell: bash
+      run: |
+        echo "Commit Message: $COMMIT_MSG"
+        echo "Full Run: $FULL_BUILD"
+        echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_OUTPUT
+        echo "FULL_BUILD=$FULL_BUILD" >> $GITHUB_OUTPUT
+      env:
+        FULL_BUILD: ${{ github.event.inputs.ci-full }}
+      if: ${{ github.event_name == 'workflow_dispatch' }}
