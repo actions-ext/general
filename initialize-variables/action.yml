@@ -11,7 +11,7 @@ inputs:
 outputs:
   COMMIT_MESSAGE:
     description: "Latest commit message"
-    value: ${{ steps.setup.outputs.COMMIT_MSG }}
+    value: ${{ steps.setuppush.outputs.COMMIT_MSG || steps.setuppr.outputs.COMMIT_MSG || steps.setupmanual.outputs.COMMIT_MSG }}
   FULL_BUILD:
     description: "Whether to do a full build"
     value:  ${{ steps.setuppush.outputs.FULL_BUILD || steps.setuppr.outputs.FULL_BUILD || steps.setupmanual.outputs.FULL_BUILD }}
@@ -32,7 +32,7 @@ runs:
 
     - name: Get Commit Message
       shell: bash
-      run: echo "COMMIT_MSG=$(git log -1 --pretty=%B HEAD^2 | tr '\n' ' ')" >> $GITHUB_ENV
+      run: echo "COMMIT_MSG=$(git log -1 --pretty=%B HEAD | tr '\n' ' ')" >> $GITHUB_ENV
       if: ${{ github.event_name == 'workflow_dispatch' }}
 
     - name: Display and Setup Build Args (Push)
@@ -45,7 +45,7 @@ runs:
         echo "FULL_BUILD=$FULL_BUILD" >> $GITHUB_OUTPUT
       env:
         FULL_BUILD: ${{ startsWith(github.ref_name, 'v') || contains(github.event.head_commit.message, '[ci-full]') || contains(env.COMMIT_MSG, '[ci-full]') }}
-        if: ${{ github.event_name == 'push' }}
+      if: ${{ github.event_name == 'push' }}
         
     - name: Display and Setup Build Args (PR)
       id: setuppr
